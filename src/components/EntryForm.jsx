@@ -8,7 +8,9 @@ const empty = {
   community: '',
   meetings: '',
   events: '',
-  letters: ''
+  letters: '',
+  lawn: '',
+  potatoes: ''
 }
 
 export default function EntryForm({ onAdd }) {
@@ -19,16 +21,17 @@ export default function EntryForm({ onAdd }) {
     e.preventDefault()
     if (!form.name.trim()) return alert('Name is required')
     if (!form.cid.trim()) return alert('CID is required')
-
     onAdd({
       name: form.name.trim(),
       cid: form.cid.trim(),
       phone: form.phone.trim(),
-      deadline: form.deadline,
+      deadline: form.deadline || null,
       community: Number(form.community || 0),
       meetings: Number(form.meetings || 0),
       events: Number(form.events || 0),
-      letters: Number(form.letters || 0)
+      letters: Number(form.letters || 0),
+      lawn: Number(form.lawn || 0),
+      potatoes: Number(form.potatoes || 0)
     })
     setForm(empty)
   }
@@ -61,12 +64,23 @@ export default function EntryForm({ onAdd }) {
         <input type="number" min="0" className="input" value={form.meetings} onChange={(e) => set('meetings', e.target.value)} />
       </div>
       <div>
-        <label className="label">Events/Food/Medical Supply Drives Remaining</label>
+        {/* Tidy shorter label to avoid the awkward wrap */}
+        <label className="label">Events/Drives (Food/Medical) Remaining</label>
         <input type="number" min="0" className="input" value={form.events} onChange={(e) => set('events', e.target.value)} />
       </div>
       <div>
         <label className="label">Letters Remaining</label>
         <input type="number" min="0" className="input" value={form.letters} onChange={(e) => set('letters', e.target.value)} />
+      </div>
+
+      {/* New fields */}
+      <div>
+        <label className="label">Lawn/Hedge Care Tasks Remaining</label>
+        <input type="number" min="0" className="input" value={form.lawn} onChange={(e) => set('lawn', e.target.value)} />
+      </div>
+      <div>
+        <label className="label">Potato Seeds to Plant</label>
+        <input type="number" min="0" className="input" value={form.potatoes} onChange={(e) => set('potatoes', e.target.value)} />
       </div>
 
       <div className="md:col-span-4 flex gap-3 justify-end">

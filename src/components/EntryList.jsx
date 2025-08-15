@@ -15,11 +15,14 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
       community: e.community ?? 0,
       meetings: e.meetings ?? 0,
       events: e.events ?? 0,
-      letters: e.letters ?? 0
+      letters: e.letters ?? 0,
+      lawn: e.lawn ?? 0,
+      potatoes: e.potatoes ?? 0
     })
   }
 
   const cancelEdit = () => { setEditingId(null); setForm(null) }
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   const saveEdit = () => {
     if (!form.name.trim()) return alert('Name is required')
@@ -28,16 +31,16 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
       name: form.name.trim(),
       cid: form.cid.trim(),
       phone: form.phone.trim(),
-      deadline: form.deadline,
+      deadline: form.deadline || null,
       community: Number(form.community || 0),
       meetings: Number(form.meetings || 0),
       events: Number(form.events || 0),
-      letters: Number(form.letters || 0)
+      letters: Number(form.letters || 0),
+      lawn: Number(form.lawn || 0),
+      potatoes: Number(form.potatoes || 0)
     })
     cancelEdit()
   }
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   if (!entries.length) {
     return <p className="text-sm text-gray-600 dark:text-gray-300">No people added yet.</p>
@@ -77,14 +80,15 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-              <span className="badge">Community: {e.community}</span>
-              <span className="badge">Meetings: {e.meetings}</span>
-              <span className="badge">Events/Drives: {e.events}</span>
-              <span className="badge">Letters: {e.letters}</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+              <span className="badge">Community: {e.community ?? 0}</span>
+              <span className="badge">Meetings: {e.meetings ?? 0}</span>
+              <span className="badge">Events/Drives: {e.events ?? 0}</span>
+              <span className="badge">Letters: {e.letters ?? 0}</span>
+              <span className="badge">Lawn/Hedge: {e.lawn ?? 0}</span>
+              <span className="badge">Potato Seeds: {e.potatoes ?? 0}</span>
             </div>
 
-            {/* Inline editor */}
             {editingId === e.id && form && (
               <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
@@ -119,6 +123,15 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
                 <div>
                   <label className="label">Letters Remaining</label>
                   <input type="number" min="0" className="input" value={form.letters} onChange={(ev) => set('letters', ev.target.value)} />
+                </div>
+
+                <div>
+                  <label className="label">Lawn/Hedge Care Tasks Remaining</label>
+                  <input type="number" min="0" className="input" value={form.lawn} onChange={(ev) => set('lawn', ev.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Potato Seeds to Plant</label>
+                  <input type="number" min="0" className="input" value={form.potatoes} onChange={(ev) => set('potatoes', ev.target.value)} />
                 </div>
               </div>
             )}
