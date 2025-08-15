@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import lizardSound from '../assets/lizard-button.mp3' // <-- make sure this path exists
+import lizardSound from '../assets/lizard-button.mp3' // ensure this file exists
 
 const empty = {
   id: null,
@@ -7,7 +7,7 @@ const empty = {
   cid: '',
   phone: '',
   deadline: '',
-  noDeadline: false,
+  noDeadline: false, // UI only; App writes deadline=null when true
   fileLink: '',
   community: '',
   meetings: '',
@@ -21,15 +21,13 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
   const [form, setForm] = useState(empty)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  // --- Lizard sound ---
+  // lizard sound
   const audioRef = useRef(null)
   useEffect(() => {
     const a = new Audio(lizardSound)
     a.preload = 'auto'
-    // a.volume = 0.9 // (optional) adjust volume if you like
     audioRef.current = a
   }, [])
-
   const clickLizard = () => {
     onLizard?.()
     try {
@@ -38,9 +36,7 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
         a.currentTime = 0
         a.play()
       }
-    } catch {
-      /* ignore gesture/autoplay errors */
-    }
+    } catch {}
   }
 
   // hydrate form when editing
@@ -66,9 +62,7 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
     })
   }, [editing])
 
-  const canSubmit = useMemo(() => {
-    return form.name.trim() && form.cid.trim()
-  }, [form.name, form.cid])
+  const canSubmit = useMemo(() => form.name.trim() && form.cid.trim(), [form.name, form.cid])
 
   const clear = () => setForm(empty)
 
@@ -98,34 +92,19 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
       {/* Name */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Name</label>
-        <input
-          className="input"
-          value={form.name}
-          onChange={(e) => set('name', e.target.value)}
-          placeholder="Jane Doe"
-        />
+        <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Jane Doe" />
       </div>
 
       {/* CID */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">CID</label>
-        <input
-          className="input"
-          value={form.cid}
-          onChange={(e) => set('cid', e.target.value)}
-          placeholder="12345"
-        />
+        <input className="input" value={form.cid} onChange={(e) => set('cid', e.target.value)} placeholder="12345" />
       </div>
 
       {/* Phone */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Phone</label>
-        <input
-          className="input"
-          value={form.phone}
-          onChange={(e) => set('phone', e.target.value)}
-          placeholder="555-1234"
-        />
+        <input className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="555-1234" />
       </div>
 
       {/* Deadline + no deadline */}
@@ -164,73 +143,37 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
       {/* Community */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Community Service Remaining</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.community}
-          onChange={(e) => set('community', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.community} onChange={(e) => set('community', e.target.value)} />
       </div>
 
       {/* Meetings */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">PA/Pillbox/PD Meetings Remaining</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.meetings}
-          onChange={(e) => set('meetings', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.meetings} onChange={(e) => set('meetings', e.target.value)} />
       </div>
 
       {/* Events */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Events/Drives (Food/Medical) Remaining</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.events}
-          onChange={(e) => set('events', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.events} onChange={(e) => set('events', e.target.value)} />
       </div>
 
       {/* Letters */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Letters Remaining</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.letters}
-          onChange={(e) => set('letters', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.letters} onChange={(e) => set('letters', e.target.value)} />
       </div>
 
       {/* Lawn/Hedge */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Lawn/Hedge Care Tasks Remaining</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.lawn}
-          onChange={(e) => set('lawn', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.lawn} onChange={(e) => set('lawn', e.target.value)} />
       </div>
 
       {/* Potatoes */}
       <div className="field col-span-12 md:col-span-4">
         <label className="label">Potato Seeds to Plant</label>
-        <input
-          type="number"
-          min="0"
-          className="input"
-          value={form.potatoes}
-          onChange={(e) => set('potatoes', e.target.value)}
-        />
+        <input type="number" min="0" className="input" value={form.potatoes} onChange={(e) => set('potatoes', e.target.value)} />
       </div>
 
       {/* Buttons */}
@@ -240,21 +183,11 @@ export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
             Cancel
           </button>
         )}
-        <button type="button" className="btn" onClick={clear}>
-          Clear
-        </button>
-        <button
-          type="button"
-          className="btn btn-success"
-          onClick={clickLizard}
-          aria-label="Lizard"
-          title="Lizard"
-        >
+        <button type="button" className="btn" onClick={clear}>Clear</button>
+        <button type="button" className="btn btn-success" onClick={clickLizard} aria-label="Lizard" title="Lizard">
           🦎
         </button>
-        <button className="btn btn-primary" type="submit">
-          {editing ? 'Update' : 'Add Person'}
-        </button>
+        <button className="btn btn-primary" type="submit">{editing ? 'Update' : 'Add Person'}</button>
       </div>
     </form>
   )

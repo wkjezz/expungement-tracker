@@ -6,8 +6,8 @@ import { supabase } from './lib/supabase.js'
 
 // ---------------- helpers ----------------
 const LS_ENTRIES = 'expungement-entries'
-const LS_LIZARD = 'lizard-count'
 
+// date helpers
 const fmtDateMDY = (d) => {
   if (!d) return ''
   try {
@@ -54,9 +54,8 @@ const reqLines = (e) => {
 
 const personDiscordBlock = (e) => {
   const top = `**Name:** ${e.name} | **CID:** ${e.cid} | **Phone:** ${e.phone || 'N/A'}`
-  const deadline =
-    e.noDeadline || !e.deadline ? null : `**Expungement Deadline:** ${fmtDateMDY(e.deadline)}`
-  const dleft = e.noDeadline || !e.deadline ? null : `**Days Left:** ${daysLeft(e.deadline)}`
+  const deadline = e.deadline ? `**Expungement Deadline:** ${fmtDateMDY(e.deadline)}` : null
+  const dleft = e.deadline ? `**Days Left:** ${daysLeft(e.deadline)}` : null
   const file = e.fileLink ? `**File Submission:** ${e.fileLink}` : null
   const req = reqLines(e)
   const body = req.length
@@ -71,14 +70,13 @@ const indentForDiscord = (text) =>
     .map((l) => (l.trim().length ? `> ${l}` : '>'))
     .join('\n')
 
-// ---- DB mapping helpers (table: people) ----
+// ---- DB mapping helpers (table: people). We use NULL deadline = "no deadline".
 const rowToEntry = (r) => ({
   id: r.id,
   name: r.name,
   cid: r.cid,
   phone: r.phone,
   deadline: r.deadline || '',
-  noDeadline: !!r.no_deadline,
   fileLink: r.file_link || '',
   community: r.community ?? 0,
   meetings: r.meetings ?? 0,
@@ -94,8 +92,7 @@ const entryToRow = (e) => ({
   name: e.name,
   cid: e.cid,
   phone: e.phone,
-  deadline: e.noDeadline ? null : (e.deadline || null),
-  no_deadline: !!e.noDeadline,
+  deadline: e.deadline ? e.deadline : null,  // null means "no deadline"
   file_link: e.fileLink || null,
   community: Number(e.community || 0),
   meetings: Number(e.meetings || 0),
@@ -107,7 +104,7 @@ const entryToRow = (e) => ({
 
 // ---------------- component ----------------
 export default function App() {
-  // entries (DB-backed with local cache)
+  // entries (DB-backed with local cache fallback)
   const [entries, setEntries] = useState(() => {
     try {
       const raw = localStorage.getItem(LS_ENTRIES)
@@ -137,7 +134,8 @@ export default function App() {
     load()
   }, [])
 
-  // 🦎 counter (local)
+  // ---------------- LIZARD COUNTER (DB-backed with local fallback) ----------------
+  const LS_LIZARD = 'lizard-count'
   const [lizard, setLizard] = useState(() => {
     const raw = localStorage.getItem(LS_LIZARD)
     return raw ? Number(raw) || 0 : 0
@@ -145,7 +143,50 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(LS_LIZARD, String(lizard))
   }, [lizard])
-  const incLizard = () => setLizard((n) => n + 1)
+
+  useEffect(() => {
+    const fetchLizard = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('stats')
+          .select('value')
+          .eq('key', 'lizard')
+          .maybeSingle()
+        if (error) throw error
+        if (data?.value != null) {
+          setLizard(Number(data.value))
+        } else {
+          await supabase.from('stats').insert({ key: 'lizard', value: 0 })
+          setLizard(0)
+        }
+      } catch (err) {
+        console.warn('Lizard fetch failed; using local fallback:', err?.message || err)
+      }
+    }
+    fetchLizard()
+  }, [])
+
+  const incLizard = async () => {
+    const next = lizard + 1
+    setLizard(next) // optimistic update
+
+    try {
+      const { data, error } = await supabase
+        .from('stats')
+        .upsert(
+          { key: 'lizard', value: next, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        )
+        .select('value')
+        .single()
+      if (error) throw error
+      if (data?.value != null) setLizard(Number(data.value))
+    } catch (err) {
+      console.error('Failed to update lizard count:', err)
+      setLizard((n) => Math.max(0, n - 1)) // optional revert
+    }
+  }
+  // -------------------------------------------------------------------------------
 
   // editing
   const [editing, setEditing] = useState(null)
@@ -165,9 +206,7 @@ export default function App() {
 
   const handleSave = async (payload) => {
     try {
-      // prepare row & upsert (insert/update)
-      const row = entryToRow(payload)
-      if (!row.id) row.id = crypto.randomUUID()
+      const row = entryToRow({ ...payload, id: payload.id || crypto.randomUUID() })
 
       const { data, error } = await supabase
         .from('people')
@@ -229,7 +268,7 @@ export default function App() {
   const tasksByDeadlineBlock = useMemo(() => {
     const groups = {}
     entries.forEach((e) => {
-      if (!e.deadline || e.noDeadline) return
+      if (!e.deadline) return
       const key = e.deadline
       if (!groups[key]) groups[key] = { community: 0, meetings: 0, events: 0, letters: 0, lawn: 0, potatoes: 0 }
       groups[key].community += Number(e.community || 0)
@@ -259,7 +298,12 @@ export default function App() {
   }, [entries])
 
   const allPeopleBlock = useMemo(() => {
-    const blocks = entries.map(personDiscordBlock).map(indentForDiscord)
+    const blocks = entries.map(personDiscordBlock).map((b) =>
+      b
+        .split('\n')
+        .map((l) => (l.trim().length ? `> ${l}` : '>'))
+        .join('\n')
+    )
     return `### All People\n\n` + (blocks.length ? blocks.join('\n\n') : '> No people.')
   }, [entries])
 
@@ -274,7 +318,6 @@ export default function App() {
         {/* Header */}
         <header className="flex items-center justify-between">
           <h1>Expungement Tracker</h1>
-          {/* show count in header; button lives on the form now */}
           <span className="badge-success">🦎 {lizard}</span>
         </header>
 
@@ -285,13 +328,12 @@ export default function App() {
             editing={editing}
             onCancel={() => setEditing(null)}
             onSave={handleSave}
-            onLizard={incLizard}   // <— 🦎 button lives next to Add
+            onLizard={incLizard}   // 🦎 updates DB + local
           />
         </section>
 
         {/* People + Master */}
         <section className="grid lg:grid-cols-2 gap-6">
-          {/* People */}
           <div className="card p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2>People</h2>
@@ -304,7 +346,6 @@ export default function App() {
             />
           </div>
 
-          {/* Master output */}
           <div className="card p-6 space-y-4">
             <h2>Master Discordia Output</h2>
 
