@@ -95,8 +95,8 @@ export default function EntryForm({ onAdd, onLizard }) {
       </div>
 
       <div className="md:col-span-4 flex gap-3 justify-end">
-        {/* 🦎 Global Lizard button (sound + counter increment) */}
-        <button className="btn btn-success" onClick={handleLizard} type="button">Lizard</button>
+        {/* Just the emoji now */}
+        <button className="btn btn-success" onClick={handleLizard} type="button">🦎</button>
 
         <button type="reset" className="btn" onClick={() => setForm(empty)}>Clear</button>
         <button className="btn btn-primary" type="submit">Add Person</button>
