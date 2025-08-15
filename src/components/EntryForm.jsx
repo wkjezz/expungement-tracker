@@ -16,11 +16,10 @@ const empty = {
   potatoes: ''
 }
 
-export default function EntryForm({ editing, onSave, onCancel }) {
+export default function EntryForm({ editing, onSave, onCancel, onLizard }) {
   const [form, setForm] = useState(empty)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  // when editing changes, hydrate the form
   useEffect(() => {
     if (!editing) {
       setForm(empty)
@@ -167,6 +166,10 @@ export default function EntryForm({ editing, onSave, onCancel }) {
           </button>
         )}
         <button type="button" className="btn" onClick={clear}>Clear</button>
+        {/* 🦎 lives next to Add Person */}
+        <button type="button" className="btn btn-success" onClick={onLizard} aria-label="Lizard">
+          🦎
+        </button>
         <button className="btn btn-primary" type="submit">{editing ? 'Update' : 'Add Person'}</button>
       </div>
     </form>

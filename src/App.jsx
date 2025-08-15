@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import EntryForm from './components/EntryForm.jsx'
 import EntryList from './components/EntryList.jsx'
 import DiscordOutput from './components/DiscordOutput.jsx'
+import { supabase } from './lib/supabase.js'
 
-// ---------------- helpers shared in App ----------------
+// ---------------- helpers ----------------
 const LS_ENTRIES = 'expungement-entries'
 const LS_LIZARD = 'lizard-count'
 
@@ -25,7 +26,6 @@ const daysLeft = (d) => {
 }
 const plural = (n, s) => (n === 1 ? s : `${s}s`)
 
-// Build a single line like "Community 3 • Meetings 2 • Letters 1" with zero-suppression
 const lineForCounts = (obj, labels) => {
   const parts = []
   for (const k of Object.keys(labels)) {
@@ -44,27 +44,24 @@ const reqLines = (e) => {
     lawn: 'Lawn/Hedge Care Tasks',
     potatoes: 'Potato Seeds to Plant'
   }
-  const lines = []
-  Object.entries(map).forEach(([k, label]) => {
+  const out = []
+  for (const [k, label] of Object.entries(map)) {
     const v = Number(e[k] || 0)
-    if (v > 0) lines.push(`• ${label}: ${v}`)
-  })
-  return lines
+    if (v > 0) out.push(`• ${label}: ${v}`)
+  }
+  return out
 }
 
 const personDiscordBlock = (e) => {
   const top = `**Name:** ${e.name} | **CID:** ${e.cid} | **Phone:** ${e.phone || 'N/A'}`
   const deadline =
-    e.noDeadline || !e.deadline
-      ? null
-      : `**Expungement Deadline:** ${fmtDateMDY(e.deadline)}`
+    e.noDeadline || !e.deadline ? null : `**Expungement Deadline:** ${fmtDateMDY(e.deadline)}`
   const dleft = e.noDeadline || !e.deadline ? null : `**Days Left:** ${daysLeft(e.deadline)}`
   const file = e.fileLink ? `**File Submission:** ${e.fileLink}` : null
   const req = reqLines(e)
   const body = req.length
     ? ['**Requirements Remaining:**', ...req].join('\n')
     : '**Requirements Remaining:**\n• None'
-
   return [top, deadline, dleft, file, body].filter(Boolean).join('\n')
 }
 
@@ -74,9 +71,43 @@ const indentForDiscord = (text) =>
     .map((l) => (l.trim().length ? `> ${l}` : '>'))
     .join('\n')
 
+// ---- DB mapping helpers (table: people) ----
+const rowToEntry = (r) => ({
+  id: r.id,
+  name: r.name,
+  cid: r.cid,
+  phone: r.phone,
+  deadline: r.deadline || '',
+  noDeadline: !!r.no_deadline,
+  fileLink: r.file_link || '',
+  community: r.community ?? 0,
+  meetings: r.meetings ?? 0,
+  events: r.events ?? 0,
+  letters: r.letters ?? 0,
+  lawn: r.lawn ?? 0,
+  potatoes: r.potatoes ?? 0,
+  created_at: r.created_at
+})
+
+const entryToRow = (e) => ({
+  id: e.id,
+  name: e.name,
+  cid: e.cid,
+  phone: e.phone,
+  deadline: e.noDeadline ? null : (e.deadline || null),
+  no_deadline: !!e.noDeadline,
+  file_link: e.fileLink || null,
+  community: Number(e.community || 0),
+  meetings: Number(e.meetings || 0),
+  events: Number(e.events || 0),
+  letters: Number(e.letters || 0),
+  lawn: Number(e.lawn || 0),
+  potatoes: Number(e.potatoes || 0),
+})
+
 // ---------------- component ----------------
 export default function App() {
-  // entries
+  // entries (DB-backed with local cache)
   const [entries, setEntries] = useState(() => {
     try {
       const raw = localStorage.getItem(LS_ENTRIES)
@@ -89,7 +120,24 @@ export default function App() {
     localStorage.setItem(LS_ENTRIES, JSON.stringify(entries))
   }, [entries])
 
-  // 🦎 counter
+  // load from Supabase on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('people')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        setEntries((data || []).map(rowToEntry))
+      } catch (err) {
+        console.warn('Supabase load failed, showing local cache instead:', err?.message || err)
+      }
+    }
+    load()
+  }, [])
+
+  // 🦎 counter (local)
   const [lizard, setLizard] = useState(() => {
     const raw = localStorage.getItem(LS_LIZARD)
     return raw ? Number(raw) || 0 : 0
@@ -100,23 +148,47 @@ export default function App() {
   const incLizard = () => setLizard((n) => n + 1)
 
   // editing
-  const [editing, setEditing] = useState(null) // an entry or null
+  const [editing, setEditing] = useState(null)
 
-  const removeEntry = (id) => {
+  const removeEntry = async (id) => {
     if (!confirm('Remove this person?')) return
-    setEntries((prev) => prev.filter((e) => e.id !== id))
-    if (editing?.id === id) setEditing(null)
+    try {
+      const { error } = await supabase.from('people').delete().eq('id', id)
+      if (error) throw error
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+      if (editing?.id === id) setEditing(null)
+    } catch (err) {
+      alert('Failed to delete from database.')
+      console.error(err)
+    }
   }
 
-  const handleSave = (payload) => {
-    setEntries((prev) => {
-      const exists = prev.some((p) => p.id === payload.id)
-      return exists ? prev.map((p) => (p.id === payload.id ? payload : p)) : [payload, ...prev]
-    })
-    setEditing(null)
+  const handleSave = async (payload) => {
+    try {
+      // prepare row & upsert (insert/update)
+      const row = entryToRow(payload)
+      if (!row.id) row.id = crypto.randomUUID()
+
+      const { data, error } = await supabase
+        .from('people')
+        .upsert(row, { onConflict: 'id' })
+        .select()
+        .single()
+
+      if (error) throw error
+      const saved = rowToEntry(data)
+      setEntries((prev) => {
+        const exists = prev.some((p) => p.id === saved.id)
+        return exists ? prev.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...prev]
+      })
+      setEditing(null)
+    } catch (err) {
+      alert('Failed to save to database.')
+      console.error(err)
+    }
   }
 
-  // totals
+  // totals / master outputs
   const totals = useMemo(() => {
     return entries.reduce(
       (acc, e) => {
@@ -132,7 +204,6 @@ export default function App() {
     )
   }, [entries])
 
-  // master outputs
   const deptTotalsBlock = useMemo(() => {
     const map = {
       community: 'Community Service',
@@ -156,7 +227,6 @@ export default function App() {
   }, [totals])
 
   const tasksByDeadlineBlock = useMemo(() => {
-    // group by date
     const groups = {}
     entries.forEach((e) => {
       if (!e.deadline || e.noDeadline) return
@@ -189,9 +259,7 @@ export default function App() {
   }, [entries])
 
   const allPeopleBlock = useMemo(() => {
-    const blocks = entries
-      .map((e) => personDiscordBlock(e))
-      .map((t) => indentForDiscord(t))
+    const blocks = entries.map(personDiscordBlock).map(indentForDiscord)
     return `### All People\n\n` + (blocks.length ? blocks.join('\n\n') : '> No people.')
   }, [entries])
 
@@ -206,12 +274,8 @@ export default function App() {
         {/* Header */}
         <header className="flex items-center justify-between">
           <h1>Expungement Tracker</h1>
-          <div className="flex items-center gap-3">
-            <button className="btn btn-success" onClick={incLizard} aria-label="Lizard">
-              🦎
-            </button>
-            <span className="badge-success">🦎 {lizard}</span>
-          </div>
+          {/* show count in header; button lives on the form now */}
+          <span className="badge-success">🦎 {lizard}</span>
         </header>
 
         {/* Add / Edit */}
@@ -221,6 +285,7 @@ export default function App() {
             editing={editing}
             onCancel={() => setEditing(null)}
             onSave={handleSave}
+            onLizard={incLizard}   // <— 🦎 button lives next to Add
           />
         </section>
 
@@ -243,7 +308,6 @@ export default function App() {
           <div className="card p-6 space-y-4">
             <h2>Master Discordia Output</h2>
 
-            {/* glance totals */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Number(totals.community) > 0 && <span className="badge">Community: {totals.community}</span>}
               {Number(totals.meetings) > 0 && <span className="badge">Meetings: {totals.meetings}</span>}
