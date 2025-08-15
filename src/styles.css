@@ -21,42 +21,33 @@
   @apply whitespace-pre-wrap break-words rounded-xl bg-slate-950/80 text-slate-100 p-4 text-sm;
 }
 
-/* Inputs — very pale yellow on dark theme */
+/* Inputs — very pale yellow on dark theme (kept from before) */
 .input {
-  /* layout */
   width: 100%;
-  border-radius: 0.75rem;      /* rounded-xl */
-  padding: 0.5rem 0.875rem;    /* py-2 px-3.5 (a touch more left padding) */
-
-  /* colors */
-  background-color: rgba(255, 248, 200, 0.08);   /* very pale yellow */
-  border: 1px solid rgba(255, 223, 128, 0.25);   /* soft amber border */
-  color: #e5e7eb;                                 /* slate-200 text */
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.875rem;
+  background-color: rgba(255, 248, 200, 0.08);
+  border: 1px solid rgba(255, 223, 128, 0.25);
+  color: #e5e7eb;
   caret-color: #e5e7eb;
-
-  /* behavior */
   outline: none;
   transition: box-shadow 120ms ease, border-color 120ms ease, background-color 120ms ease;
-
-  /* keep long placeholders/content tidy */
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
 }
-
 .input:focus {
-  border-color: #fcd34d;                           /* amber-300 */
-  box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.35);  /* ring-2 amber-300 */
-  background-color: rgba(255, 248, 200, 0.12);     /* a hair brighter on focus */
+  border-color: #fcd34d;
+  box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.35);
+  background-color: rgba(255, 248, 200, 0.12);
 }
 
-/* placeholder styling + a tiny extra indent */
+/* 🔁 NEW: white placeholders */
 .input::placeholder {
-  color: #f5e6a9;      /* pale yellow placeholder */
-  opacity: 0.9;
-  text-indent: 0.05rem;
+  color: rgba(255, 255, 255, 0.9);  /* white */
+  opacity: 1;                      /* ensure it isn’t dimmed */
+  text-indent: 0.05rem;            /* tiny indent so text doesn’t hug the edge */
 }
-
 
 .label {
   @apply text-sm font-medium text-slate-300;

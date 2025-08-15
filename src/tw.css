@@ -834,27 +834,18 @@ a:hover {
   color: rgb(241 245 249 / var(--tw-text-opacity, 1));
 }
 
-/* Inputs — very pale yellow on dark theme */
+/* Inputs — very pale yellow on dark theme (kept from before) */
 
 .input {
-  /* layout */
   width: 100%;
   border-radius: 0.75rem;
-  /* rounded-xl */
   padding: 0.5rem 0.875rem;
-  /* py-2 px-3.5 (a touch more left padding) */
-  /* colors */
   background-color: rgba(255, 248, 200, 0.08);
-  /* very pale yellow */
   border: 1px solid rgba(255, 223, 128, 0.25);
-  /* soft amber border */
   color: #e5e7eb;
-  /* slate-200 text */
   caret-color: #e5e7eb;
-  /* behavior */
   outline: none;
   transition: box-shadow 120ms ease, border-color 120ms ease, background-color 120ms ease;
-  /* keep long placeholders/content tidy */
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -862,27 +853,28 @@ a:hover {
 
 .input:focus {
   border-color: #fcd34d;
-  /* amber-300 */
   box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.35);
-  /* ring-2 amber-300 */
   background-color: rgba(255, 248, 200, 0.12);
-  /* a hair brighter on focus */
 }
 
-/* placeholder styling + a tiny extra indent */
+/* 🔁 NEW: white placeholders */
 
 .input::-moz-placeholder {
-  color: #f5e6a9;
-  /* pale yellow placeholder */
-  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
+  /* white */
+  opacity: 1;
+  /* ensure it isn’t dimmed */
   text-indent: 0.05rem;
+  /* tiny indent so text doesn’t hug the edge */
 }
 
 .input::placeholder {
-  color: #f5e6a9;
-  /* pale yellow placeholder */
-  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
+  /* white */
+  opacity: 1;
+  /* ensure it isn’t dimmed */
   text-indent: 0.05rem;
+  /* tiny indent so text doesn’t hug the edge */
 }
 
 .label {
