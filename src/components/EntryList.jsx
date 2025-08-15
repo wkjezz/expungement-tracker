@@ -1,195 +1,110 @@
-import React, { useState } from 'react'
+import React from 'react'
 import DiscordOutput from './DiscordOutput.jsx'
 
-export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock, daysLeft, formatDateLong }) {
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(null)
-
-  const startEdit = (e) => {
-    setEditingId(e.id)
-    setForm({
-      name: e.name,
-      cid: e.cid,
-      phone: e.phone || '',
-      deadline: e.deadline || '',
-      noDeadline: !e.deadline,
-      fileLink: e.file_link || '',
-      community: e.community ?? 0,
-      meetings: e.meetings ?? 0,
-      events: e.events ?? 0,
-      letters: e.letters ?? 0,
-      lawn: e.lawn ?? 0,
-      potatoes: e.potatoes ?? 0
-    })
+// local helper copies (kept here to avoid extra imports)
+const fmtDateMDY = (d) => {
+  if (!d) return ''
+  try {
+    const dt = new Date(d + 'T00:00:00')
+    return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  } catch {
+    return d
   }
+}
+const daysLeft = (d) => {
+  if (!d) return null
+  const target = new Date(d + 'T00:00:00').getTime()
+  const today = new Date(); today.setHours(0,0,0,0)
+  const diff = Math.ceil((target - today.getTime()) / (1000 * 60 * 60 * 24))
+  return diff
+}
+const plural = (n, s) => (n === 1 ? s : `${s}s`)
 
-  const cancelEdit = () => { setEditingId(null); setForm(null) }
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-
-  const saveEdit = () => {
-    if (!form.name.trim()) return alert('Name is required')
-    if (!form.cid.trim()) return alert('CID is required')
-    onUpdate(editingId, {
-      name: form.name.trim(),
-      cid: form.cid.trim(),
-      phone: form.phone.trim(),
-      deadline: form.noDeadline ? null : (form.deadline || null),
-      fileLink: form.fileLink.trim() || null,
-      community: Number(form.community || 0),
-      meetings: Number(form.meetings || 0),
-      events: Number(form.events || 0),
-      letters: Number(form.letters || 0),
-      lawn: Number(form.lawn || 0),
-      potatoes: Number(form.potatoes || 0)
-    })
-    cancelEdit()
+const reqLines = (e) => {
+  const map = {
+    community: 'Community Service',
+    meetings: 'PA/Pillbox/PD Meetings',
+    events: 'Events/Food/Medical Supply Drives',
+    letters: 'Letters',
+    lawn: 'Lawn/Hedge Care Tasks',
+    potatoes: 'Potato Seeds to Plant'
   }
+  const lines = []
+  Object.entries(map).forEach(([k, label]) => {
+    const v = Number(e[k] || 0)
+    if (v > 0) lines.push(`• ${label}: ${v}`)
+  })
+  return lines
+}
 
+const personDiscordBlock = (e) => {
+  const top = `**Name:** ${e.name} | **CID:** ${e.cid} | **Phone:** ${e.phone || 'N/A'}`
+  const deadline =
+    e.noDeadline || !e.deadline
+      ? null
+      : `**Expungement Deadline:** ${fmtDateMDY(e.deadline)}`
+  const dleft = e.noDeadline || !e.deadline ? null : `**Days Left:** ${daysLeft(e.deadline)}`
+  const file = e.fileLink ? `**File Submission:** ${e.fileLink}` : null
+  const req = reqLines(e)
+  const body = req.length
+    ? ['**Requirements Remaining:**', ...req].join('\n')
+    : '**Requirements Remaining:**\n• None'
+
+  return [top, deadline, dleft, file, body].filter(Boolean).join('\n')
+}
+
+export default function EntryList({ entries, onEdit, onRemove }) {
   if (!entries.length) {
-    return <p className="text-sm text-gray-600 dark:text-gray-300">No people added yet.</p>
+    return <p className="text-sm text-slate-400">No people added yet.</p>
   }
 
   return (
     <ul className="space-y-4">
-      {entries.map((e) => {
-        const days = e.deadline ? daysLeft?.(e.deadline) : null
-        const deadlineLabel = e.deadline ? formatDateLong?.(e.deadline) : null
-
-        return (
-          <li key={e.id} className="border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{e.name}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                  CID: {e.cid} • Phone: {e.phone || 'N/A'}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {e.deadline ? (
-                    <>Deadline: {deadlineLabel}{typeof days === 'number' ? ` • ${days} day(s) left` : ''}</>
-                  ) : (
-                    <>Deadline: No deadline</>
-                  )}
-                </div>
-                {e.file_link && (
-                  <div className="text-xs mt-1">
-                    <a
-                      href={e.file_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-indigo-400 hover:text-indigo-300 underline"
-                    >
-                      File submission link
-                    </a>
-                  </div>
-                )}
+      {entries.map((e) => (
+        <li key={e.id} className="rounded-xl border border-slate-700 p-4 bg-slate-800/60">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-medium">{e.name}</div>
+              <div className="text-sm text-slate-300">
+                CID: {e.cid} • Phone: {e.phone || 'N/A'}
               </div>
-
-              <div className="flex gap-2">
-                {editingId === e.id ? (
-                  <>
-                    <button className="btn" onClick={cancelEdit}>Cancel</button>
-                    <button className="btn btn-primary" onClick={saveEdit}>Save</button>
-                  </>
-                ) : (
-                  <>
-                    <button className="btn" onClick={() => startEdit(e)}>Edit</button>
-                    <button className="btn" onClick={() => onRemove(e.id)}>Remove</button>
-                  </>
-                )}
+              <div className="text-xs text-slate-400 mt-1">
+                {e.noDeadline || !e.deadline
+                  ? 'Deadline: No deadline'
+                  : `Deadline: ${fmtDateMDY(e.deadline)}${
+                      daysLeft(e.deadline) != null ? ` • ${daysLeft(e.deadline)} ${plural(daysLeft(e.deadline), 'day')} left` : ''
+                    }`}
               </div>
+              {e.fileLink && (
+                <div className="mt-1 text-xs">
+                  <a href={e.fileLink} target="_blank" rel="noreferrer">
+                    File submission link
+                  </a>
+                </div>
+              )}
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
-              {!!e.community && <span className="badge">Community: {e.community}</span>}
-              {!!e.meetings && <span className="badge">Meetings: {e.meetings}</span>}
-              {!!e.events && <span className="badge">Events/Drives: {e.events}</span>}
-              {!!e.letters && <span className="badge">Letters: {e.letters}</span>}
-              {!!e.lawn && <span className="badge">Lawn/Hedge: {e.lawn}</span>}
-              {!!e.potatoes && <span className="badge">Potatoes: {e.potatoes}</span>}
+            <div className="flex items-center gap-2">
+              <button className="btn" onClick={() => onEdit(e.id)}>Edit</button>
+              <button className="btn" onClick={() => onRemove(e.id)}>Remove</button>
             </div>
+          </div>
 
-            {/* Inline editor */}
-            {editingId === e.id && form && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="label">Name</label>
-                  <input className="input" value={form.name} onChange={(ev) => set('name', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">CID</label>
-                  <input className="input" value={form.cid} onChange={(ev) => set('cid', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Phone</label>
-                  <input className="input" value={form.phone} onChange={(ev) => set('phone', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Expungement Deadline</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={form.deadline}
-                    onChange={(ev) => set('deadline', ev.target.value)}
-                    disabled={form.noDeadline}
-                  />
-                  <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-                    <input
-                      type="checkbox"
-                      className="rounded"
-                      checked={form.noDeadline}
-                      onChange={(ev) => {
-                        const checked = ev.target.checked
-                        setForm((f) => ({ ...f, noDeadline: checked, deadline: checked ? '' : f.deadline }))
-                      }}
-                    />
-                    No deadline
-                  </label>
-                </div>
+          {/* badges */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+            {Number(e.community) > 0 && <span className="badge">Community: {e.community}</span>}
+            {Number(e.meetings) > 0 && <span className="badge">Meetings: {e.meetings}</span>}
+            {Number(e.events) > 0 && <span className="badge">Events/Drives: {e.events}</span>}
+            {Number(e.letters) > 0 && <span className="badge">Letters: {e.letters}</span>}
+            {Number(e.lawn) > 0 && <span className="badge">Lawn/Hedge: {e.lawn}</span>}
+            {Number(e.potatoes) > 0 && <span className="badge">Potatoes: {e.potatoes}</span>}
+          </div>
 
-                <div className="md:col-span-2">
-                  <label className="label">File Submission Link (Discord thread)</label>
-                  <input
-                    type="url"
-                    className="input"
-                    placeholder="https://discord.com/channels/..."
-                    value={form.fileLink}
-                    onChange={(ev) => set('fileLink', ev.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Community Remaining</label>
-                  <input type="number" min="0" className="input" value={form.community} onChange={(ev) => set('community', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Meetings Remaining</label>
-                  <input type="number" min="0" className="input" value={form.meetings} onChange={(ev) => set('meetings', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Events/Drives Remaining</label>
-                  <input type="number" min="0" className="input" value={form.events} onChange={(ev) => set('events', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Letters Remaining</label>
-                  <input type="number" min="0" className="input" value={form.letters} onChange={(ev) => set('letters', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Lawn/Hedge Care Tasks Remaining</label>
-                  <input type="number" min="0" className="input" value={form.lawn} onChange={(ev) => set('lawn', ev.target.value)} />
-                </div>
-                <div>
-                  <label className="label">Potato Seeds to Plant</label>
-                  <input type="number" min="0" className="input" value={form.potatoes} onChange={(ev) => set('potatoes', ev.target.value)} />
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4">
-              <DiscordOutput title="Discordia Output — Person" text={makePersonBlock ? makePersonBlock(e) : ''} />
-            </div>
-          </li>
-        )
-      })}
+          {/* per-person Discord block */}
+          <div className="mt-4">
+            <DiscordOutput title="Discordia Output — Person" text={personDiscordBlock(e)} />
+          </div>
+        </li>
+      ))}
     </ul>
   )
 }
