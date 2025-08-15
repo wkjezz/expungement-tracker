@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
+import lizardSfx from '../assets/lizard-button.mp3'
 
 const empty = {
   name: '',
@@ -13,8 +14,10 @@ const empty = {
   potatoes: ''
 }
 
-export default function EntryForm({ onAdd }) {
+export default function EntryForm({ onAdd, onLizard }) {
   const [form, setForm] = useState(empty)
+  const audioRef = useRef(null)
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   const submit = (e) => {
@@ -34,6 +37,16 @@ export default function EntryForm({ onAdd }) {
       potatoes: Number(form.potatoes || 0)
     })
     setForm(empty)
+  }
+
+  const handleLizard = (e) => {
+    e.preventDefault()
+    try {
+      if (!audioRef.current) audioRef.current = new Audio(lizardSfx)
+      const a = audioRef.current
+      a.pause(); a.currentTime = 0; a.play()
+    } catch {}
+    onLizard?.()
   }
 
   return (
@@ -64,7 +77,6 @@ export default function EntryForm({ onAdd }) {
         <input type="number" min="0" className="input" value={form.meetings} onChange={(e) => set('meetings', e.target.value)} />
       </div>
       <div>
-        {/* Tidy shorter label to avoid the awkward wrap */}
         <label className="label">Events/Drives (Food/Medical) Remaining</label>
         <input type="number" min="0" className="input" value={form.events} onChange={(e) => set('events', e.target.value)} />
       </div>
@@ -73,7 +85,6 @@ export default function EntryForm({ onAdd }) {
         <input type="number" min="0" className="input" value={form.letters} onChange={(e) => set('letters', e.target.value)} />
       </div>
 
-      {/* New fields */}
       <div>
         <label className="label">Lawn/Hedge Care Tasks Remaining</label>
         <input type="number" min="0" className="input" value={form.lawn} onChange={(e) => set('lawn', e.target.value)} />
@@ -84,6 +95,9 @@ export default function EntryForm({ onAdd }) {
       </div>
 
       <div className="md:col-span-4 flex gap-3 justify-end">
+        {/* 🦎 Global Lizard button (sound + counter increment) */}
+        <button className="btn btn-success" onClick={handleLizard} type="button">Lizard</button>
+
         <button type="reset" className="btn" onClick={() => setForm(empty)}>Clear</button>
         <button className="btn btn-primary" type="submit">Add Person</button>
       </div>

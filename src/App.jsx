@@ -4,6 +4,7 @@ import EntryList from './components/EntryList.jsx'
 import DiscordOutput from './components/DiscordOutput.jsx'
 import { supabase } from './lib/supabase.js'
 
+/* ---------- Dark mode (persisted) ---------- */
 function useDarkMode() {
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem('theme')
@@ -19,7 +20,7 @@ function useDarkMode() {
   return [dark, setDark]
 }
 
-/* ET helpers */
+/* ---------- ET helpers ---------- */
 function parseYMD(str){ if(!str) return null; const [y,m,d]=str.split('-').map(Number); return y&&m&&d?{y,m,d}:null }
 function todayNY_ymd(){ const nowNY=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})); return {y:nowNY.getFullYear(), m:nowNY.getMonth()+1, d:nowNY.getDate()} }
 function daysLeftET(deadlineStr){
@@ -49,6 +50,44 @@ export default function App() {
   const [dark, setDark] = useDarkMode()
   const [loading, setLoading] = useState(false)
 
+  /* ---------- Global Lizard counter (Supabase) ---------- */
+  const [lizardCount, setLizardCount] = useState(0)
+  const [lizardBusy, setLizardBusy] = useState(false)
+
+  const loadLizard = async () => {
+    const { data, error } = await supabase
+      .from('stats')
+      .select('value')
+      .eq('key','lizard')
+      .single()
+    if (!error && data) setLizardCount(Number(data.value || 0))
+    // if not found, the SQL migration already inserted row; but just in case:
+    if (error && error.code === 'PGRST116') { // not found
+      await supabase.from('stats').insert({ key:'lizard', value:0 })
+      setLizardCount(0)
+    }
+  }
+
+  const hitLizard = async () => {
+    if (lizardBusy) return
+    setLizardBusy(true)
+    // Prefer RPC for atomic increment
+    const { data, error } = await supabase.rpc('inc_counter', { k: 'lizard', delta: 1 })
+    if (!error && typeof data === 'number') {
+      setLizardCount(data)
+    } else {
+      // Fallback (non-atomic) in case RPC not available
+      const { data: row } = await supabase
+        .from('stats')
+        .upsert({ key: 'lizard', value: lizardCount + 1 })
+        .select()
+        .single()
+      if (row) setLizardCount(Number(row.value || (lizardCount + 1)))
+    }
+    setLizardBusy(false)
+  }
+
+  /* ---------- Load app data ---------- */
   useEffect(() => {
     (async () => {
       setLoading(true)
@@ -56,8 +95,10 @@ export default function App() {
       setEntries(Array.isArray(data) ? data : [])
       setLoading(false)
     })()
+    loadLizard()
   }, [])
 
+  /* ---------- CRUD for entries ---------- */
   const addEntry = async (entry) => {
     const payload = {
       name: entry.name,
@@ -96,6 +137,7 @@ export default function App() {
     if (!error) setEntries((prev) => prev.filter((e) => e.id !== id))
   }
 
+  /* ---------- Totals/Discord ---------- */
   const totals = useMemo(()=>entries.reduce((acc,e)=>{
     acc.community+=Number(e.community||0)
     acc.meetings +=Number(e.meetings ||0)
@@ -122,9 +164,7 @@ export default function App() {
       `• Potato Seeds to Plant: ${e.potatoes ?? 0}`
     )
   }
-
   const allPeopleDiscord = entries.length ? entries.map(personBlock).join('\n\n') : 'No people added yet.'
-
   const cumulativeDiscord =
     `**Department Totals Remaining**\n` +
     `• Community Service: ${totals.community}\n` +
@@ -134,7 +174,6 @@ export default function App() {
     `• Lawn/Hedge Care Tasks: ${totals.lawn}\n` +
     `• Potato Seeds to Plant: ${totals.potatoes}\n\n` +
     `*Disclaimer: This does not include HUT Expungement clients or parolees.*`
-
   const byDeadline = useMemo(()=>groupTotalsByDeadline(entries),[entries])
   const byDeadlineDiscord = (() => {
     const keys = Object.keys(byDeadline).sort()
@@ -147,20 +186,24 @@ export default function App() {
     })
     return `**Tasks by Deadline (ET)**\n` + lines.join('\n')
   })()
-
   const megaDiscord = `${cumulativeDiscord}\n\n${byDeadlineDiscord}\n\n**All People**\n${allPeopleDiscord}`
 
+  /* ---------- UI ---------- */
   return (
     <div className="min-h-screen p-6 md:p-10">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex items-center justify-between">
           <h1 className="text-2xl md:text-3xl font-semibold">Expungement Tracker</h1>
-          <button className="btn" onClick={()=>setDark(v=>!v)}>{dark ? '🌙 Dark' : '☀️ Light'}</button>
+          <div className="flex items-center gap-3">
+            <span className="badge-success">🦎 {lizardCount}{lizardBusy ? '…' : ''}</span>
+            <button className="btn" onClick={()=>setDark(v=>!v)}>{dark ? '🌙 Dark' : '☀️ Light'}</button>
+          </div>
         </header>
 
         <section className="card p-4 md:p-6">
           <h2 className="text-lg font-semibold mb-4">Add Person</h2>
-          <EntryForm onAdd={addEntry} />
+          {/* Lizard is handled globally via Supabase counter */}
+          <EntryForm onAdd={addEntry} onLizard={hitLizard} />
         </section>
 
         <section className="grid lg:grid-cols-2 gap-6">
