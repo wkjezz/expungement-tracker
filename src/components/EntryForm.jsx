@@ -7,6 +7,7 @@ const empty = {
   phone: '',
   deadline: '',     // string YYYY-MM-DD
   noDeadline: false,
+  fileLink: '',     // NEW: Discord thread URL
   community: '',
   meetings: '',
   events: '',
@@ -31,6 +32,7 @@ export default function EntryForm({ onAdd, onLizard }) {
       cid: form.cid.trim(),
       phone: form.phone.trim(),
       deadline: form.noDeadline ? null : (form.deadline || null),
+      fileLink: form.fileLink.trim() || null,
       community: Number(form.community || 0),
       meetings: Number(form.meetings || 0),
       events: Number(form.events || 0),
@@ -90,6 +92,18 @@ export default function EntryForm({ onAdd, onLizard }) {
           />
           No deadline
         </label>
+      </div>
+
+      {/* NEW: File submission link */}
+      <div className="md:col-span-2">
+        <label className="label">File Submission Link (Discord thread)</label>
+        <input
+          type="url"
+          className="input"
+          placeholder="https://discord.com/channels/..."
+          value={form.fileLink}
+          onChange={(e) => set('fileLink', e.target.value)}
+        />
       </div>
 
       <div>

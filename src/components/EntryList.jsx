@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import DiscordOutput from './DiscordOutput.jsx'
 
-export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock, daysLeft }) {
+export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock, daysLeft, formatDateLong }) {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(null)
 
@@ -12,7 +12,8 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
       cid: e.cid,
       phone: e.phone || '',
       deadline: e.deadline || '',
-      noDeadline: !e.deadline, // true if null
+      noDeadline: !e.deadline,
+      fileLink: e.file_link || '',
       community: e.community ?? 0,
       meetings: e.meetings ?? 0,
       events: e.events ?? 0,
@@ -33,6 +34,7 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
       cid: form.cid.trim(),
       phone: form.phone.trim(),
       deadline: form.noDeadline ? null : (form.deadline || null),
+      fileLink: form.fileLink.trim() || null,
       community: Number(form.community || 0),
       meetings: Number(form.meetings || 0),
       events: Number(form.events || 0),
@@ -51,6 +53,8 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
     <ul className="space-y-4">
       {entries.map((e) => {
         const days = e.deadline ? daysLeft?.(e.deadline) : null
+        const deadlineLabel = e.deadline ? formatDateLong?.(e.deadline) : null
+
         return (
           <li key={e.id} className="border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
@@ -61,11 +65,23 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {e.deadline ? (
-                    <>Deadline: {e.deadline}{typeof days === 'number' ? ` • ${days} day(s) left` : ''}</>
+                    <>Deadline: {deadlineLabel}{typeof days === 'number' ? ` • ${days} day(s) left` : ''}</>
                   ) : (
                     <>Deadline: No deadline</>
                   )}
                 </div>
+                {e.file_link && (
+                  <div className="text-xs mt-1">
+                    <a
+                      href={e.file_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 underline"
+                    >
+                      File submission link
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -123,11 +139,22 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
                       checked={form.noDeadline}
                       onChange={(ev) => {
                         const checked = ev.target.checked
-                        set((f) => ({ ...f, noDeadline: checked, deadline: checked ? '' : f.deadline }))
+                        setForm((f) => ({ ...f, noDeadline: checked, deadline: checked ? '' : f.deadline }))
                       }}
                     />
                     No deadline
                   </label>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="label">File Submission Link (Discord thread)</label>
+                  <input
+                    type="url"
+                    className="input"
+                    placeholder="https://discord.com/channels/..."
+                    value={form.fileLink}
+                    onChange={(ev) => set('fileLink', ev.target.value)}
+                  />
                 </div>
 
                 <div>
@@ -146,7 +173,6 @@ export default function EntryList({ entries, onRemove, onUpdate, makePersonBlock
                   <label className="label">Letters Remaining</label>
                   <input type="number" min="0" className="input" value={form.letters} onChange={(ev) => set('letters', ev.target.value)} />
                 </div>
-
                 <div>
                   <label className="label">Lawn/Hedge Care Tasks Remaining</label>
                   <input type="number" min="0" className="input" value={form.lawn} onChange={(ev) => set('lawn', ev.target.value)} />
