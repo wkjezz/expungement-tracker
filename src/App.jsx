@@ -32,6 +32,13 @@ function groupTotalsByDeadline(entries){
   return groups
 }
 
+/* convenience for hiding zeros in any list of [label, value] */
+function linesWithoutZeros(pairs){
+  return pairs
+    .filter(([,v]) => Number(v) > 0)
+    .map(([label,v]) => `• ${label}: ${v}`)
+}
+
 export default function App() {
   // Force dark theme (no toggle)
   useEffect(() => { document.documentElement.classList.add('dark') }, [])
@@ -106,7 +113,6 @@ export default function App() {
     const payload = {
       ...patch,
       phone: patch.phone ?? undefined,
-      // if the editor sends { noDeadline: true } we convert to null; UI does that before calling onUpdate
       deadline: patch.deadline === undefined ? undefined : (patch.deadline || null),
       community: patch.community !== undefined ? Number(patch.community) : undefined,
       meetings: patch.meetings !== undefined ? Number(patch.meetings) : undefined,
@@ -141,16 +147,16 @@ export default function App() {
     const daysText = (d ?? null) !== null ? `\n**Days Left:** ${d}` : ''
     const deadline = e.deadline ? `\n**Expungement Deadline:** ${e.deadline}` : ''
 
-    const reqs = [
+    const reqLines = linesWithoutZeros([
       ['Community Service', Number(e.community || 0)],
       ['PA/Pillbox/PD Meetings', Number(e.meetings || 0)],
       ['Events/Food/Medical Supply Drives', Number(e.events || 0)],
       ['Letters', Number(e.letters || 0)],
       ['Lawn/Hedge Care Tasks', Number(e.lawn || 0)],
       ['Potato Seeds to Plant', Number(e.potatoes || 0)],
-    ]
-    const lines = reqs.filter(([,v]) => v > 0).map(([label,v]) => `• ${label}: ${v}`)
-    const requirementsSection = lines.length ? `\n**Requirements Remaining:**\n${lines.join('\n')}` : ''
+    ])
+
+    const requirementsSection = reqLines.length ? `\n**Requirements Remaining:**\n${reqLines.join('\n')}` : ''
 
     return (
       `**Name:** ${e.name} | **CID:** ${e.cid} | **Phone:** ${e.phone || 'N/A'}` +
@@ -160,32 +166,52 @@ export default function App() {
     )
   }
 
-  const allPeopleDiscord = entries.length ? entries.map(personBlock).join('\n\n') : 'No people added yet.'
+  // Build "All People" as blockquotes with a header and blank lines
+  const allPeopleBlocks = entries.length ? entries.map(personBlock) : []
+  const toBlockquote = (s) => s.split('\n').map(line => `> ${line}`).join('\n')
+  const allPeopleDiscord = allPeopleBlocks.length
+    ? allPeopleBlocks.map(toBlockquote).join('\n\n')
+    : 'No people added yet.'
 
+  // Department totals — hide zeros
+  const totalsLines = linesWithoutZeros([
+    ['Community Service', totals.community],
+    ['PA/Pillbox/PD Meetings', totals.meetings],
+    ['Events/Food/Medical Supply Drives', totals.events],
+    ['Letters', totals.letters],
+    ['Lawn/Hedge Care Tasks', totals.lawn],
+    ['Potato Seeds to Plant', totals.potatoes],
+  ])
   const cumulativeDiscord =
     `**Department Totals Remaining**\n` +
-    `• Community Service: ${totals.community}\n` +
-    `• PA/Pillbox/PD Meetings: ${totals.meetings}\n` +
-    `• Events/Food/Medical Supply Drives: ${totals.events}\n` +
-    `• Letters: ${totals.letters}\n` +
-    `• Lawn/Hedge Care Tasks: ${totals.lawn}\n` +
-    `• Potato Seeds to Plant: ${totals.potatoes}\n\n` +
+    (totalsLines.length ? `${totalsLines.join('\n')}\n\n` : '\n') +
     `*Disclaimer: This does not include HUT Expungement clients or parolees.*`
 
+  // Tasks by deadline — hide zeros (and skip dates where everything is zero)
   const byDeadline = useMemo(()=>groupTotalsByDeadline(entries),[entries])
   const byDeadlineDiscord = (() => {
     const keys = Object.keys(byDeadline).sort()
-    if (!keys.length) return 'No deadlines set.'
-    const lines = keys.map(date=>{
+    const perDateLines = []
+    for (const date of keys) {
       const d = byDeadline[date]
       const n = daysLeft(date)
-      const t = (n ?? null) !== null ? ` (in ${n} days)` : ''
-      return `${date}${t}: Community ${d.community} • Meetings ${d.meetings} • Events/Drives ${d.events} • Letters ${d.letters} • Lawn/Hedge ${d.lawn} • Potatoes ${d.potatoes}`
-    })
-    return `**Tasks by Deadline**\n` + lines.join('\n')
+      const tail = linesWithoutZeros([
+        ['Community', d.community],
+        ['Meetings', d.meetings],
+        ['Events/Drives', d.events],
+        ['Letters', d.letters],
+        ['Lawn/Hedge', d.lawn],
+        ['Potatoes', d.potatoes],
+      ])
+      if (!tail.length) continue // skip zero-only dates
+      perDateLines.push(`${date}${(n ?? null) !== null ? ` (in ${n} days)` : ''}: ${tail.join(' • ')}`)
+    }
+    if (!perDateLines.length) return 'No deadlines with tasks.'
+    return `**Tasks by Deadline**\n` + perDateLines.join('\n')
   })()
 
-  const megaDiscord = `${cumulativeDiscord}\n\n${byDeadlineDiscord}\n\n**All People**\n${allPeopleDiscord}`
+  const megaDiscord =
+    `${cumulativeDiscord}\n\n${byDeadlineDiscord}\n\n### All People\n\n${allPeopleDiscord}`
 
   /* ---------- UI ---------- */
   return (
@@ -214,7 +240,7 @@ export default function App() {
               onRemove={removeEntry}
               onUpdate={updateEntry}
               makePersonBlock={personBlock}
-              daysLeft={daysLeft}           // pass calculator
+              daysLeft={daysLeft}
             />
           </div>
 
