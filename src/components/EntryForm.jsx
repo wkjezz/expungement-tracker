@@ -5,7 +5,8 @@ const empty = {
   name: '',
   cid: '',
   phone: '',
-  deadline: '',
+  deadline: '',     // string YYYY-MM-DD
+  noDeadline: false,
   community: '',
   meetings: '',
   events: '',
@@ -24,11 +25,12 @@ export default function EntryForm({ onAdd, onLizard }) {
     e.preventDefault()
     if (!form.name.trim()) return alert('Name is required')
     if (!form.cid.trim()) return alert('CID is required')
+
     onAdd({
       name: form.name.trim(),
       cid: form.cid.trim(),
       phone: form.phone.trim(),
-      deadline: form.deadline || null,
+      deadline: form.noDeadline ? null : (form.deadline || null),
       community: Number(form.community || 0),
       meetings: Number(form.meetings || 0),
       events: Number(form.events || 0),
@@ -63,9 +65,31 @@ export default function EntryForm({ onAdd, onLizard }) {
         <label className="label">Phone</label>
         <input className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="555-1234" />
       </div>
+
+      {/* Deadline + No deadline */}
       <div>
         <label className="label">Expungement Deadline</label>
-        <input type="date" className="input" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            className="input"
+            value={form.deadline}
+            onChange={(e) => set('deadline', e.target.value)}
+            disabled={form.noDeadline}
+          />
+        </div>
+        <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+          <input
+            type="checkbox"
+            className="rounded"
+            checked={form.noDeadline}
+            onChange={(e) => {
+              const checked = e.target.checked
+              setForm((f) => ({ ...f, noDeadline: checked, deadline: checked ? '' : f.deadline }))
+            }}
+          />
+          No deadline
+        </label>
       </div>
 
       <div>
@@ -95,7 +119,7 @@ export default function EntryForm({ onAdd, onLizard }) {
       </div>
 
       <div className="md:col-span-4 flex gap-3 justify-end">
-        {/* Just the emoji now */}
+        {/* Lizard = emoji only */}
         <button className="btn btn-success" onClick={handleLizard} type="button">🦎</button>
 
         <button type="reset" className="btn" onClick={() => setForm(empty)}>Clear</button>

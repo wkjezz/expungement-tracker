@@ -4,9 +4,9 @@ import EntryList from './components/EntryList.jsx'
 import DiscordOutput from './components/DiscordOutput.jsx'
 import { supabase } from './lib/supabase.js'
 
-/* ---------- Helpers ---------- */
+/* ---------- Helpers (no timezone text shown to users) ---------- */
 function parseYMD(str){ if(!str) return null; const [y,m,d]=str.split('-').map(Number); return y&&m&&d?{y,m,d}:null }
-function todayNY_ymd(){ // still using New York time for consistency, but we don't display "ET"
+function todayNY_ymd(){ // use America/New_York to align date math with US East, but don't label it
   const nowNY=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}))
   return {y:nowNY.getFullYear(), m:nowNY.getMonth()+1, d:nowNY.getDate()}
 }
@@ -19,7 +19,7 @@ function daysLeft(deadlineStr){
 function groupTotalsByDeadline(entries){
   const groups={}
   for(const e of entries){
-    if(!e.deadline) continue
+    if(!e.deadline) continue // skip "No deadline"
     const k=e.deadline
     if(!groups[k]) groups[k]={community:0,meetings:0,events:0,letters:0,lawn:0,potatoes:0}
     groups[k].community+=Number(e.community||0)
@@ -90,7 +90,7 @@ export default function App() {
       name: entry.name,
       cid: entry.cid,
       phone: entry.phone || null,
-      deadline: entry.deadline || null,
+      deadline: entry.deadline || null, // null when "No deadline"
       community: Number(entry.community || 0),
       meetings: Number(entry.meetings || 0),
       events: Number(entry.events || 0),
@@ -106,7 +106,8 @@ export default function App() {
     const payload = {
       ...patch,
       phone: patch.phone ?? undefined,
-      deadline: patch.deadline ?? undefined,
+      // if the editor sends { noDeadline: true } we convert to null; UI does that before calling onUpdate
+      deadline: patch.deadline === undefined ? undefined : (patch.deadline || null),
       community: patch.community !== undefined ? Number(patch.community) : undefined,
       meetings: patch.meetings !== undefined ? Number(patch.meetings) : undefined,
       events: patch.events !== undefined ? Number(patch.events) : undefined,
@@ -134,23 +135,33 @@ export default function App() {
     return acc
   },{community:0,meetings:0,events:0,letters:0,lawn:0,potatoes:0}),[entries])
 
-  const headerLine='**Requirements Remaining:**'
+  // Per-person Discord block: hide zero requirements + hide deadline/days if no deadline
   const personBlock = (e) => {
     const d = daysLeft(e.deadline)
     const daysText = (d ?? null) !== null ? `\n**Days Left:** ${d}` : ''
     const deadline = e.deadline ? `\n**Expungement Deadline:** ${e.deadline}` : ''
+
+    const reqs = [
+      ['Community Service', Number(e.community || 0)],
+      ['PA/Pillbox/PD Meetings', Number(e.meetings || 0)],
+      ['Events/Food/Medical Supply Drives', Number(e.events || 0)],
+      ['Letters', Number(e.letters || 0)],
+      ['Lawn/Hedge Care Tasks', Number(e.lawn || 0)],
+      ['Potato Seeds to Plant', Number(e.potatoes || 0)],
+    ]
+    const lines = reqs.filter(([,v]) => v > 0).map(([label,v]) => `• ${label}: ${v}`)
+    const requirementsSection = lines.length ? `\n**Requirements Remaining:**\n${lines.join('\n')}` : ''
+
     return (
       `**Name:** ${e.name} | **CID:** ${e.cid} | **Phone:** ${e.phone || 'N/A'}` +
-      deadline + daysText + `\n${headerLine}\n` +
-      `• Community Service: ${e.community}\n` +
-      `• PA/Pillbox/PD Meetings: ${e.meetings}\n` +
-      `• Events/Food/Medical Supply Drives: ${e.events}\n` +
-      `• Letters: ${e.letters}\n` +
-      `• Lawn/Hedge Care Tasks: ${e.lawn ?? 0}\n` +
-      `• Potato Seeds to Plant: ${e.potatoes ?? 0}`
+      deadline +
+      daysText +
+      requirementsSection
     )
   }
+
   const allPeopleDiscord = entries.length ? entries.map(personBlock).join('\n\n') : 'No people added yet.'
+
   const cumulativeDiscord =
     `**Department Totals Remaining**\n` +
     `• Community Service: ${totals.community}\n` +
@@ -160,6 +171,7 @@ export default function App() {
     `• Lawn/Hedge Care Tasks: ${totals.lawn}\n` +
     `• Potato Seeds to Plant: ${totals.potatoes}\n\n` +
     `*Disclaimer: This does not include HUT Expungement clients or parolees.*`
+
   const byDeadline = useMemo(()=>groupTotalsByDeadline(entries),[entries])
   const byDeadlineDiscord = (() => {
     const keys = Object.keys(byDeadline).sort()
@@ -172,6 +184,7 @@ export default function App() {
     })
     return `**Tasks by Deadline**\n` + lines.join('\n')
   })()
+
   const megaDiscord = `${cumulativeDiscord}\n\n${byDeadlineDiscord}\n\n**All People**\n${allPeopleDiscord}`
 
   /* ---------- UI ---------- */
@@ -201,7 +214,7 @@ export default function App() {
               onRemove={removeEntry}
               onUpdate={updateEntry}
               makePersonBlock={personBlock}
-              daysLeftET={daysLeft /* prop name can stay; text no longer says (ET) */}
+              daysLeft={daysLeft}           // pass calculator
             />
           </div>
 
